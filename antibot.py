@@ -4,12 +4,17 @@ import sys, getopt
 import time
 import vkontakte as vk
 
-GROUP_ID = '123456'
-CITY_ID = 1   # Moscow
+from settings import APP_ID
+from settings import APP_SECRET
+from settings import GROUP_ID
+from settings import CITY_ID
+
 
 class VKUserChecker(object):
     def __init__(self, token, filename, begin, post_id, count, offset):
-        self.api = vk.API(token=token, timeout=20)
+        if token:
+            self.api = vk.API(token=token, timeout=20)
+        self.api = vk.API(APP_ID, APP_SECRET, timeout=20)
         self.begin = int(begin)
         self.post_id = int(post_id)
         self.offset = int(offset)
@@ -45,13 +50,13 @@ class VKUserChecker(object):
             time.sleep(1)
 
         ulsk_friends, fail_friends = [], []
-        for friend in friends:
+        for friend in users:
             if 'city' not in friend or 'deactivated' in friend:
                 fail_friends.append(friend)
             else:
                 if int(friend['city']) == CITY_ID:
                     ulsk_friends.append(friend)
-        return len(ulsk_friends), len(friends), len(fail_friends)
+        return len(ulsk_friends), len(users), len(fail_friends)
 
     def get_followers(self, uid):
         users = []
@@ -61,8 +66,8 @@ class VKUserChecker(object):
             count = followers['count']
             users += followers['items']
             if len(users) >= count:
-                offset += 1000
                 break
+            offset += 1000
             time.sleep(1)
 
         ulsk_users, fail_users = [], []
@@ -200,6 +205,22 @@ class VKUserChecker(object):
 
     def sort_out(self):
         users = self.get_user_list()
+
+        self.save_info('%s %s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' % (
+            'Num.',
+            'uid',
+            'Local friends',
+            'All friends',
+            'Deactivated friends',
+            'Local followers',
+            'All followers',
+            'Deactivated followers',
+            'city',
+            'Photo url',
+            'First name',
+            'Last name',
+            'Group member'
+        ))
 
         num = self.begin
         for uid in users:
