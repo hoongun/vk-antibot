@@ -10,20 +10,29 @@ from settings import GROUP_ID
 from settings import CITY_ID
 
 
-class VKUserChecker(object):
-    def __init__(self, token, filename, begin, post_id, count, offset):
-        if token:
-            self.api = vk.API(token=token, timeout=20)
-        self.api = vk.API(APP_ID, APP_SECRET, timeout=20)
-        self.begin = int(begin)
-        self.post_id = int(post_id)
-        self.offset = int(offset)
-        self.count = int(count)
+class SaveInfo(object):
+    def __init__(self, filename='./prize.txt'):
         self.file = open(filename, 'a')
 
     def save_info(self, line):
         self.file.write(line + '\r\n')
         self.file.flush()
+
+class VKBase(SaveInfo):
+    def __init__(self, token='', *args, **kwargs):
+        super(VKBase, self).__init__(*args, **kwargs)
+        if token:
+            self.api = vk.API(token=token, timeout=20)
+        self.api = vk.API(APP_ID, APP_SECRET, timeout=20)
+
+
+class VKUserChecker(VKBase):
+    def __init__(self, token='', filename='./prize.txt', begin=0, post_id=3, count=1000, offset=0):
+        super(VKUserChecker, self).__init__(token, filename)
+        self.begin = int(begin)
+        self.post_id = int(post_id)
+        self.offset = int(offset)
+        self.count = int(count)
 
     def get_city_name(self, user):
         while True:
@@ -264,7 +273,7 @@ class VKUserChecker(object):
             print line
 
 
-class Reposters(VKUserChecker):
+class RepostersMixin(VKBase):
     def get_user_list(self):
         users = []
         offset = self.offset
@@ -287,7 +296,7 @@ class Reposters(VKUserChecker):
         return users
 
 
-class GroupMembers(VKUserChecker):
+class GroupMembersMixin(VKBase):
     def get_user_list(self):
         users = []
         offset = self.offset
@@ -307,6 +316,58 @@ class GroupMembers(VKUserChecker):
         return users
 
 
+class RepostersFromGroupMixin(VKBase):
+    def get_reposters_list(self):
+        users = []
+        offset = self.offset
+        while True:
+            likes = self.api.get('likes.getList',
+                type='post',
+                owner_id='-' + GROUP_ID,
+                item_id=self.post_id,
+                filter='copies',
+                count=1000,
+                offset=offset
+            )
+            time.sleep(3)
+            count = likes['count']
+            users += likes['users']
+            if (len(users) + self.offset) >= count:
+                break
+            else:
+                offset += 1000
+        return users
+
+    def get_group_user_list(self):
+        users = []
+        offset = self.offset
+        while True:
+            group = self.api.get('groups.getMembers',
+                group_id=GROUP_ID,
+                count=1000,
+                offset=offset
+            )
+            time.sleep(3)
+            count = group['count']
+            users += group['users']
+            if (len(users) + self.offset) >= count:
+                break
+            else:
+                offset += 1000
+        return users
+
+
+    def get_user_list(self):
+        reposters = self.get_reposters_list()
+        group_users = self.get_group_user_list()
+
+        reposters, group_users = set(reposters), set(group_users)
+        users = reposters.intersection(group_users)
+
+        print 'Reposters and group users: ', len(reposters), len(group_users)
+        print 'Intersection: ', len(users)
+        return users
+
 # class FollowersChecker(Reposters):
 #     def get_followers(self, uid):
 #         users = []
@@ -325,6 +386,10 @@ class GroupMembers(VKUserChecker):
 #                 if int(user['city']) == CITY_ID:
 #                     ulsk_users.append(user)
 #         return len(ulsk_users), len(users), len(fail_users)
+
+
+class Antibot(VKUserChecker, RepostersFromGroupMixin):
+    pass
 
 
 def main(argv):
@@ -359,7 +424,7 @@ def main(argv):
             offset = arg
 
     print 'IN ', token, filename, begin, post_id, count, offset
-    a = Reposters(token=token, filename=filename, begin=begin, post_id=post_id, count=count, offset=offset)
+    a = Antibot(token=token, filename=filename, begin=begin, post_id=post_id, count=count, offset=offset)
     a.sort_out()
 
 if __name__ == "__main__":
