@@ -30,7 +30,7 @@ class VKUserChecker(VKBase):
     def __init__(self, token='', filename='./prize.txt', begin=0, post_id=3, count=1000, offset=0):
         super(VKUserChecker, self).__init__(token, filename)
         self.begin = int(begin)
-        self.post_id = int(post_id)
+        self.post_id = post_id
         self.offset = int(offset)
         self.count = int(count)
 
@@ -281,7 +281,7 @@ class RepostersMixin(VKBase):
             likes = self.api.get('likes.getList',
                 type='post',
                 owner_id='-' + GROUP_ID,
-                item_id=self.post_id,
+                item_id=int(self.post_id),
                 filter='copies',
                 count=1000,
                 offset=offset
@@ -324,7 +324,29 @@ class RepostersFromGroupMixin(VKBase):
             likes = self.api.get('likes.getList',
                 type='post',
                 owner_id='-' + GROUP_ID,
-                item_id=self.post_id,
+                item_id=int(self.post_id),
+                filter='copies',
+                count=1000,
+                offset=offset
+            )
+            time.sleep(3)
+            count = likes['count']
+            users += likes['users']
+            if (len(users) + self.offset) >= count:
+                break
+            else:
+                offset += 1000
+        return users
+
+    def get_reposters_list_by_user(self):
+        users = []
+        offset = self.offset
+        while True:
+            user_id, self.post_id = self.post_id.split('_')
+            likes = self.api.get('likes.getList',
+                type='post',
+                owner_id=user_id,
+                item_id=int(self.post_id),
                 filter='copies',
                 count=1000,
                 offset=offset
@@ -358,13 +380,14 @@ class RepostersFromGroupMixin(VKBase):
 
 
     def get_user_list(self):
-        reposters = self.get_reposters_list()
-        group_users = self.get_group_user_list()
+        # reposters = self.get_reposters_list()
+        reposters = self.get_reposters_list_by_user()
+        #group_users = self.get_group_user_list()
 
-        reposters, group_users = set(reposters), set(group_users)
-        users = reposters.intersection(group_users)
+        #reposters, group_users = set(reposters), set(group_users)
+        users = reposters#.intersection(group_users)
 
-        print 'Reposters and group users: ', len(reposters), len(group_users)
+        #print 'Reposters and group users: ', len(reposters), len(group_users)
         print 'Intersection: ', len(users)
         return users
 
